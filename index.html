@@ -1500,6 +1500,7 @@
 
         class OPStageChip {
             constructor(imageItem, targetPos, entryDirection, exitDirection) {
+                this.imageItem = imageItem;
                 const chipColor = (imageItem && imageItem.chipColor !== undefined)
                     ? imageItem.chipColor
                     : colorPresets[Math.floor(Math.random() * colorPresets.length)].hex;
@@ -1659,9 +1660,17 @@
                 createNewWaveBackground();
             }
 
-            // Pick a random chip item from registered imageItems
-            const randomItemIndex = Math.floor(Math.random() * imageItems.length);
-            const currentItem = imageItems[randomItemIndex];
+            // Filter out items already present in the current WAVE so each chip in the WAVE has a unique image!
+            const usedNames = stageChips.map(c => c.imageItem ? c.imageItem.name : null).filter(Boolean);
+            let availableItems = imageItems.filter(item => !usedNames.includes(item.name));
+
+            // If all registered items have been used in this wave, fallback to full pool
+            if (availableItems.length === 0) {
+                availableItems = imageItems;
+            }
+
+            const randomItemIndex = Math.floor(Math.random() * availableItems.length);
+            const currentItem = availableItems[randomItemIndex];
             const targetPos = getNonOverlappingTargetPosOnBg(currentBgShapeType, stageChips, maxCount);
 
             const entryDirs = ['top', 'bottom', 'left', 'right'];
