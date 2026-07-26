@@ -1,0 +1,2008 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Casino Chip Viewer & Stage Showcase</title>
+    <style>
+        :root {
+            --bg-color: #000000;
+            --panel-bg: rgba(18, 24, 38, 0.92);
+            --accent-color: #d4af37;
+            --accent-glow: rgba(212, 175, 55, 0.4);
+            --text-color: #e6e8ee;
+            --border-color: rgba(255, 255, 255, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        #webgl-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+
+        .ui-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            pointer-events: none;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 20px;
+            transition: opacity 0.3s ease, transform 0.3s ease;
+        }
+
+        .ui-overlay.ui-hidden {
+            opacity: 0;
+            transform: scale(0.98);
+            pointer-events: none !important;
+        }
+
+        .ui-toggle-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 100;
+            pointer-events: auto;
+            background: var(--panel-bg);
+            border: 1px solid var(--border-color);
+            color: var(--accent-color);
+            padding: 10px 16px;
+            border-radius: 30px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ui-toggle-btn:hover {
+            background: var(--accent-color);
+            color: #000;
+            box-shadow: 0 0 16px var(--accent-glow);
+        }
+
+        header {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            padding: 12px 24px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            max-width: 1380px;
+            margin: 0 auto;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #fff 0%, #d4af37 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        h1::before {
+            content: '🎰';
+            font-size: 1.25rem;
+            -webkit-text-fill-color: initial;
+        }
+
+        .controls-bar {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .btn {
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            padding: 8px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn:hover {
+            background: rgba(212, 175, 55, 0.2);
+            border-color: var(--accent-color);
+            transform: translateY(-1px);
+        }
+
+        .btn.active {
+            background: var(--accent-color);
+            color: #000;
+            font-weight: 600;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        .btn-export {
+            background: linear-gradient(135deg, #d4af37 0%, #aa820a 100%);
+            color: #000;
+            font-weight: 600;
+            border: none;
+        }
+
+        .btn-export:hover {
+            background: linear-gradient(135deg, #f0c84b 0%, #c49917 100%);
+            box-shadow: 0 0 16px rgba(212, 175, 55, 0.6);
+        }
+
+        .tab-group {
+            display: flex;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 4px;
+            border-radius: 10px;
+            border: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            padding: 6px 14px;
+            border-radius: 6px;
+            border: none;
+            background: transparent;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-record {
+            background: linear-gradient(135deg, #e53e3e 0%, #9b2c2c 100%);
+            color: #fff;
+            font-weight: 600;
+            border: none;
+        }
+
+        .btn-record:hover {
+            background: linear-gradient(135deg, #fc8181 0%, #c53030 100%);
+            box-shadow: 0 0 16px rgba(229, 62, 62, 0.6);
+        }
+
+        .btn-record.recording {
+            animation: pulse-red 1.2s infinite;
+        }
+
+        @keyframes pulse-red {
+            0% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0.7); }
+            70% { box-shadow: 0 0 0 12px rgba(229, 62, 62, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(229, 62, 62, 0); }
+        }
+
+        .tab-btn.active {
+            background: var(--accent-color);
+            color: #000;
+            font-weight: 600;
+        }
+
+        .side-panel {
+            pointer-events: auto;
+            position: absolute;
+            right: 20px;
+            top: 80px;
+            width: 340px;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            max-height: calc(100vh - 170px);
+            overflow-y: auto;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .side-panel.hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateX(20px);
+        }
+
+        .panel-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .panel-title {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: rgba(255, 255, 255, 0.5);
+            font-weight: 600;
+        }
+
+        .color-presets {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 8px;
+        }
+
+        .color-dot {
+            width: 100%;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid rgba(255, 255, 255, 0.2);
+            transition: transform 0.2s, border-color 0.2s;
+        }
+
+        .color-dot:hover, .color-dot.active {
+            transform: scale(1.15);
+            border-color: #fff;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+        }
+
+        .image-carousel {
+            pointer-events: auto;
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 10px 16px;
+            max-width: 1060px;
+            margin: 0 auto;
+            width: 100%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow-x: auto;
+            transition: opacity 0.3s;
+        }
+
+        .thumb-item {
+            flex: 0 0 60px;
+            height: 60px;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            background: #000;
+        }
+
+        .thumb-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .thumb-item:hover {
+            transform: scale(1.08);
+            border-color: rgba(212, 175, 55, 0.5);
+        }
+
+        .thumb-item .thumb-delete-btn {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            width: 18px;
+            height: 18px;
+            background: rgba(220, 38, 38, 0.9);
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: bold;
+            opacity: 0;
+            transition: opacity 0.2s;
+            z-index: 5;
+        }
+
+        .thumb-item:hover .thumb-delete-btn {
+            opacity: 1;
+        }
+
+        .modal-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.82);
+            backdrop-filter: blur(12px);
+            z-index: 9999 !important;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-backdrop.active {
+            opacity: 1;
+            pointer-events: auto !important;
+        }
+
+        .modal-card {
+            background: rgba(18, 24, 38, 0.98);
+            border: 1px solid var(--accent-color);
+            border-radius: 20px;
+            padding: 28px;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: 0 16px 48px rgba(0, 0, 0, 0.9), 0 0 20px rgba(212, 175, 55, 0.2);
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            text-align: center;
+            pointer-events: auto !important;
+        }
+
+        .modal-card h3 {
+            font-size: 1.1rem;
+            color: var(--accent-color);
+        }
+
+        .modal-card p {
+            font-size: 0.9rem;
+            color: rgba(255, 255, 255, 0.8);
+            line-height: 1.5;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+        }
+
+        .modal-buttons button {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.2s;
+        }
+
+        .btn-modal-replace {
+            background: linear-gradient(135deg, #d4af37 0%, #aa820a 100%);
+            color: #000;
+        }
+
+        .btn-modal-replace:hover {
+            box-shadow: 0 0 12px var(--accent-glow);
+            transform: translateY(-1px);
+        }
+
+        .btn-modal-add {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border: 1px solid var(--border-color) !important;
+        }
+
+        .btn-modal-add:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-modal-cancel {
+            background: transparent;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .btn-modal-cancel:hover {
+            color: #fff;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .control-group label {
+            font-size: 0.8rem;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .control-group input[type="range"], select, input[type="file"] {
+            width: 100%;
+            accent-color: var(--accent-color);
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 6px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+        }
+
+        select option {
+            background: #121826;
+            color: #fff;
+        }
+
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-color);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 16px;
+            transition: opacity 0.5s ease;
+        }
+
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid rgba(212, 175, 55, 0.1);
+            border-top-color: var(--accent-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Google Font for Luxury Casino Typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&display=swap" rel="stylesheet">
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
+</head>
+<body>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        <p style="color: var(--accent-color); letter-spacing: 1px;">3D CASINO CHIP VIEWER LOADING...</p>
+    </div>
+
+    <button class="ui-toggle-btn" id="ui-toggle-btn">👁️ UIを非表示</button>
+
+    <div id="webgl-container"></div>
+
+    <div class="ui-overlay" id="ui-overlay">
+        <header>
+            <h1>3D CASINO CHIP VIEWER</h1>
+            
+            <div class="tab-group">
+                <button class="tab-btn active" id="tab-single">単体モデルビューアー</button>
+                <button class="tab-btn" id="tab-stage">マルチ演出モード</button>
+            </div>
+
+            <div class="controls-bar">
+                <button class="btn btn-record" id="btn-record-video">🎥 演出動画を録画 (.webm)</button>
+                <button class="btn btn-export" id="btn-export">💾 3Dモデル出力 (.glb)</button>
+                <button class="btn" id="btn-export-obj">📄 .obj形式で保存</button>
+            </div>
+        </header>
+
+        <div class="side-panel" id="side-panel">
+            <div class="panel-section" id="section-single-controls">
+                <span class="panel-title">単体表示アクション</span>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn active" id="btn-spin" style="flex:1">🔄 自動回転</button>
+                    <button class="btn" id="btn-flip" style="flex:1">🔁 ひっくり返す</button>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">📁 画像セット読み込み</span>
+                <div class="control-group">
+                    <label>ローカル画像ファイル選択 (複数可)</label>
+                    <input type="file" id="file-input" multiple accept="image/*">
+                </div>
+                <div class="control-group">
+                    <label>フォルダから一括選択</label>
+                    <input type="file" id="folder-input" webkitdirectory directory multiple>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">🔄 裏面デザイン設定</span>
+                <div class="control-group">
+                    <label>裏面スタイル (一括設定)</label>
+                    <select id="back-design-select">
+                        <option value="same" selected>表面と同じイラスト (フルカラー)</option>
+                        <option value="metallic">重厚メタル質感モノクロイラスト</option>
+                        <option value="gold_relief">🏆 立体金メダルレリーフ彫刻</option>
+                        <option value="silver_relief">🥈 立体銀メダルレリーフ彫刻</option>
+                        <option value="number">カジノ数字 (Luxury Gold Font)</option>
+                        <option value="rings">図案化二重丸 (ゴールド幾何学エンブレム)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">🖼️ 画像位置・サイズ微調整</span>
+                <div class="control-group">
+                    <label><span>ズーム (Scale)</span><span id="val-img-scale">1.0</span></label>
+                    <input type="range" id="input-img-scale" min="0.5" max="2.0" step="0.05" value="1.0">
+                </div>
+                <div class="control-group">
+                    <label><span>位置 (Offset X)</span><span id="val-img-offx">0.0</span></label>
+                    <input type="range" id="input-img-offx" min="-0.5" max="0.5" step="0.02" value="0.0">
+                </div>
+                <div class="control-group">
+                    <label><span>位置 (Offset Y)</span><span id="val-img-offy">0.0</span></label>
+                    <input type="range" id="input-img-offy" min="-0.5" max="0.5" step="0.02" value="0.0">
+                </div>
+            </div>
+
+            <div class="panel-section hidden" id="section-stage-controls">
+                <span class="panel-title">マルチ演出設定</span>
+                <div class="control-group">
+                    <label><span>チップのサイズ</span><span id="val-chip-scale">0.65</span></label>
+                    <input type="range" id="input-chip-scale" min="0.3" max="1.0" step="0.05" value="0.65">
+                </div>
+                <div class="control-group">
+                    <label>登場間隔 (秒)</label>
+                    <select id="stage-interval-select">
+                        <option value="1.5">1.5秒おき</option>
+                        <option value="2.5" selected>2.5秒おき (推奨)</option>
+                        <option value="3.5">3.5秒おき</option>
+                    </select>
+                </div>
+                <div class="control-group">
+                    <label>WAVE最大チップ数</label>
+                    <select id="stage-count-select">
+                        <option value="4">4枚でリセット</option>
+                        <option value="5" selected>5枚でリセット</option>
+                        <option value="6">6枚でリセット</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">ベースカラー</span>
+                <div class="color-presets" id="color-presets"></div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">エッジストライプ色</span>
+                <div class="color-presets" id="stripe-presets"></div>
+            </div>
+
+            <div class="panel-section">
+                <span class="panel-title">マテリアル設定</span>
+                <div class="control-group">
+                    <label><span>金属感 (Metalness)</span><span id="val-metal">0.3</span></label>
+                    <input type="range" id="input-metal" min="0" max="1" step="0.05" value="0.3">
+                </div>
+                <div class="control-group">
+                    <label><span>粗さ (Roughness)</span><span id="val-rough">0.25</span></label>
+                    <input type="range" id="input-rough" min="0.05" max="1" step="0.05" value="0.25">
+                </div>
+                <div class="control-group">
+                    <label><span>厚み (Thickness)</span><span id="val-height">0.15</span></label>
+                    <input type="range" id="input-height" min="0.08" max="0.3" step="0.01" value="0.15">
+                </div>
+            </div>
+        </div>
+
+        <div class="image-carousel" id="image-carousel">
+            <!-- Dynamic Thumbnails -->
+        </div>
+    </div>
+
+    <script>
+        let imageItems = [];
+
+        // Generate procedural default fallback texture when no user image is loaded yet
+        function createDefaultFallbackTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(0, 0, 512, 512);
+
+            const grad = ctx.createLinearGradient(0, 0, 512, 512);
+            grad.addColorStop(0, '#ffe082');
+            grad.addColorStop(0.5, '#d4af37');
+            grad.addColorStop(1, '#8a6d1c');
+
+            ctx.strokeStyle = grad;
+            ctx.lineWidth = 16;
+            ctx.beginPath();
+            ctx.arc(256, 256, 220, 0, Math.PI * 2);
+            ctx.stroke();
+
+            ctx.fillStyle = grad;
+            ctx.font = 'bold 36px "Segoe UI", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('画像を読み込んでください', 256, 230);
+            
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.font = '22px "Segoe UI", sans-serif';
+            ctx.fillText('📁 ファイル・フォルダ選択', 256, 280);
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.encoding = THREE.sRGBEncoding;
+            tex.center.set(0.5, 0.5);
+            return tex;
+        }
+
+        const colorPresets = [
+            { name: 'Red', hex: 0xcc1100 },
+            { name: 'Blue', hex: 0x0055ff },
+            { name: 'Black', hex: 0x1a1a1d },
+            { name: 'Green', hex: 0x008844 },
+            { name: 'Purple', hex: 0x7700aa },
+            { name: 'Gold', hex: 0xd4af37 },
+            { name: 'Cyan', hex: 0x00aabb },
+            { name: 'White', hex: 0xeeeeee }
+        ];
+
+        const stripePresets = [
+            { name: 'White', hex: 0xffffff },
+            { name: 'Gold', hex: 0xd4af37 },
+            { name: 'Black', hex: 0x111111 },
+            { name: 'Red', hex: 0xcc1100 },
+            { name: 'Blue', hex: 0x0055ff }
+        ];
+
+        const bgPalettes = [
+            { c1: '#2e7d32', c2: '#4caf50' }, // Classic Emerald Green
+            { c1: '#8e0000', c2: '#d32f2f' }, // Royal Red
+            { c1: '#0d47a1', c2: '#1e88e5' }, // Sapphire Blue
+            { c1: '#4a148c', c2: '#8e24aa' }, // Deep Purple
+            { c1: '#e65100', c2: '#fb8c00' }, // Sunset Orange
+            { c1: '#1b5e20', c2: '#00c853' }, // Neon Green
+            { c1: '#212121', c2: '#424242' }  // Sleek Dark Gray
+        ];
+
+        const casinoNumbers = ['10', '50', '100', '500', '1000', '10000'];
+
+        let currentImageIndex = 0;
+        let currentChipColor = 0xcc1100;
+        let currentStripeColor = 0xffffff;
+        let isAutoSpin = true;
+        let currentMode = 'single';
+        let isUIHidden = false;
+
+        let imgScale = 1.0;
+        let imgOffsetX = 0.0;
+        let imgOffsetY = 0.0;
+
+        const container = document.getElementById('webgl-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x080b12);
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(0, 2.5, 5.5);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        renderer.outputEncoding = THREE.sRGBEncoding;
+        container.appendChild(renderer.domElement);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.target.set(0, 0, 0);
+
+        // Ensure canvas element handles mouse drag without any blocking
+        renderer.domElement.style.pointerEvents = 'auto';
+
+        // Lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+        scene.add(ambientLight);
+
+        const mainLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        mainLight.position.set(2, 4, 6);
+        scene.add(mainLight);
+
+        const textureLoader = new THREE.TextureLoader();
+        let loadedTextures = {};
+        let reliefCache = {}; // Cache for generated 3D relief normal maps to avoid heavy CPU recalculation
+
+        // Texture Baking Utility: Draws image with scale, offset, and rotation directly onto a 512x512 Canvas.
+        // This eliminates dependency on KHR_texture_transform extension in GLTFExporter,
+        // ensuring 100% compatibility with Windows 3D Viewer, Blender, Unity, etc.
+        function createBakedCanvas(inputSource, isBack = false) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            let imgElement = null;
+            if (inputSource) {
+                if (inputSource instanceof HTMLCanvasElement || inputSource instanceof HTMLImageElement) {
+                    imgElement = inputSource;
+                } else if (inputSource.image) {
+                    imgElement = inputSource.image;
+                }
+            }
+
+            if (!imgElement) {
+                const fallbackTex = createDefaultFallbackTexture();
+                imgElement = fallbackTex.image;
+            }
+
+            ctx.save();
+            ctx.translate(256, 256);
+            if (isBack) {
+                ctx.rotate(Math.PI);
+            }
+            const pxOffsetX = -imgOffsetX * 512;
+            const pxOffsetY = imgOffsetY * 512;
+            ctx.translate(pxOffsetX, pxOffsetY);
+            ctx.scale(imgScale, imgScale);
+            ctx.drawImage(imgElement, -256, -256, 512, 512);
+            ctx.restore();
+
+            return canvas;
+        }
+
+        function loadSingleTexture(item, callback) {
+            if (loadedTextures[item.name]) {
+                if (callback) callback(loadedTextures[item.name]);
+                return;
+            }
+            textureLoader.load(item.url, (tex) => {
+                tex.encoding = THREE.sRGBEncoding;
+                loadedTextures[item.name] = tex;
+                if (callback) callback(tex);
+            });
+        }
+
+        function preloadTextures(callback) {
+            let loadedCount = 0;
+            imageItems.forEach(item => {
+                loadSingleTexture(item, () => {
+                    loadedCount++;
+                    if (loadedCount === imageItems.length && callback) callback();
+                });
+            });
+        }
+
+        function createReliefTextures(inputSource, type = 'gold') {
+            const bakedCanvas = createBakedCanvas(inputSource, true);
+            const width = 512;
+            const height = 512;
+
+            const diffCanvas = document.createElement('canvas');
+            diffCanvas.width = width;
+            diffCanvas.height = height;
+            const diffCtx = diffCanvas.getContext('2d');
+            diffCtx.drawImage(bakedCanvas, 0, 0, width, height);
+
+            const imgData = diffCtx.getImageData(0, 0, width, height);
+            const d = imgData.data;
+
+            const grayArray = new Float32Array(width * height);
+
+            for (let i = 0; i < d.length; i += 4) {
+                let gray = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+                let norm = gray / 255;
+                norm = norm < 0.5 ? 2 * norm * norm : 1 - Math.pow(-2 * norm + 2, 2) / 2;
+                gray = norm * 255;
+                grayArray[i / 4] = gray;
+
+                if (type === 'gold') {
+                    d[i] = Math.min(255, 180 + gray * 0.3);
+                    d[i + 1] = Math.min(255, 140 + gray * 0.28);
+                    d[i + 2] = Math.min(255, 40 + gray * 0.15);
+                } else if (type === 'silver') {
+                    d[i] = Math.min(255, 140 + gray * 0.45);
+                    d[i + 1] = Math.min(255, 145 + gray * 0.45);
+                    d[i + 2] = Math.min(255, 155 + gray * 0.45);
+                } else {
+                    d[i] = Math.min(255, gray * 1.15 + 20);
+                    d[i + 1] = Math.min(255, gray * 1.12 + 18);
+                    d[i + 2] = Math.min(255, gray * 1.05 + 10);
+                }
+            }
+            diffCtx.putImageData(imgData, 0, 0);
+
+            const radGrad = diffCtx.createRadialGradient(width / 2, height / 2, width * 0.1, width / 2, height / 2, width * 0.5);
+            if (type === 'gold') {
+                radGrad.addColorStop(0, 'rgba(255, 220, 100, 0.2)');
+                radGrad.addColorStop(0.8, 'rgba(212, 175, 55, 0.05)');
+                radGrad.addColorStop(1, 'rgba(100, 70, 10, 0.4)');
+            } else if (type === 'silver') {
+                radGrad.addColorStop(0, 'rgba(255, 255, 255, 0.25)');
+                radGrad.addColorStop(0.8, 'rgba(200, 205, 215, 0.05)');
+                radGrad.addColorStop(1, 'rgba(60, 65, 75, 0.4)');
+            } else {
+                radGrad.addColorStop(0, 'rgba(255, 255, 255, 0.45)');
+                radGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+                radGrad.addColorStop(1, 'rgba(0, 0, 0, 0.55)');
+            }
+            diffCtx.fillStyle = radGrad;
+            diffCtx.fillRect(0, 0, width, height);
+
+            const diffuseTex = new THREE.CanvasTexture(diffCanvas);
+            diffuseTex.encoding = THREE.sRGBEncoding;
+
+            const normCanvas = document.createElement('canvas');
+            normCanvas.width = width;
+            normCanvas.height = height;
+            const normCtx = normCanvas.getContext('2d');
+            const normImgData = normCtx.createImageData(width, height);
+            const nd = normImgData.data;
+
+            const scale = 2.5;
+
+            for (let y = 1; y < height - 1; y++) {
+                for (let x = 1; x < width - 1; x++) {
+                    const topLeft = grayArray[(y - 1) * width + (x - 1)];
+                    const top = grayArray[(y - 1) * width + x];
+                    const topRight = grayArray[(y - 1) * width + (x + 1)];
+                    const left = grayArray[y * width + (x - 1)];
+                    const right = grayArray[y * width + (x + 1)];
+                    const bottomLeft = grayArray[(y + 1) * width + (x - 1)];
+                    const bottom = grayArray[(y + 1) * width + x];
+                    const bottomRight = grayArray[(y + 1) * width + (x + 1)];
+
+                    const dx = (topRight + 2 * right + bottomRight) - (topLeft + 2 * left + bottomLeft);
+                    const dy = (bottomLeft + 2 * bottom + bottomRight) - (topLeft + 2 * top + topRight);
+                    const dz = 255.0 / scale;
+
+                    const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+                    const nx = (dx / len) * 0.5 + 0.5;
+                    const ny = (dy / len) * 0.5 + 0.5;
+                    const nz = (dz / len) * 0.5 + 0.5;
+
+                    const idx = (y * width + x) * 4;
+                    nd[idx] = Math.floor(nx * 255);
+                    nd[idx + 1] = Math.floor(ny * 255);
+                    nd[idx + 2] = Math.floor(nz * 255);
+                    nd[idx + 3] = 255;
+                }
+            }
+            normCtx.putImageData(normImgData, 0, 0);
+
+            const normalTex = new THREE.CanvasTexture(normCanvas);
+
+            return { diffuseTex, normalTex };
+        }
+
+        function createNumberBackTexture(numberStr, baseColorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#' + baseColorHex.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, 512, 512);
+
+            const grad = ctx.createLinearGradient(0, 0, 512, 512);
+            grad.addColorStop(0, 'rgba(255,255,255,0.3)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.4)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, 512, 512);
+
+            // Apply 180-degree rotation so number renders right-side-up when chip is flipped to back face
+            ctx.save();
+            ctx.translate(256, 256);
+            ctx.rotate(Math.PI);
+
+            ctx.save();
+            ctx.rotate(Math.PI / 4);
+            ctx.strokeStyle = 'rgba(212, 175, 55, 0.4)';
+            ctx.lineWidth = 12;
+            ctx.strokeRect(-160, -160, 320, 320);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+            ctx.lineWidth = 4;
+            ctx.strokeRect(-175, -175, 350, 350);
+            ctx.restore();
+
+            ctx.save();
+            ctx.fillStyle = '#ffffff';
+            ctx.shadowColor = 'rgba(0,0,0,0.8)';
+            ctx.shadowBlur = 15;
+            ctx.font = '900 130px "Outfit", sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(numberStr, 0, 0);
+
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 3;
+            ctx.strokeText(numberStr, 0, 0);
+            ctx.restore();
+
+            ctx.restore();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.encoding = THREE.sRGBEncoding;
+            return texture;
+        }
+
+        function createRingsBackTexture(baseColorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            ctx.fillStyle = '#' + baseColorHex.toString(16).padStart(6, '0');
+            ctx.fillRect(0, 0, 512, 512);
+
+            ctx.strokeStyle = '#d4af37';
+            ctx.lineWidth = 8;
+            for (let r = 50; r < 240; r += 35) {
+                ctx.beginPath();
+                ctx.arc(256, 256, r, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+            ctx.beginPath();
+            ctx.arc(256, 256, 120, 0, Math.PI * 2);
+            ctx.fill();
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.encoding = THREE.sRGBEncoding;
+            return texture;
+        }
+
+        function createEdgeTexture(baseColorHex, stripeColorHex) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+
+            const baseColor = '#' + baseColorHex.toString(16).padStart(6, '0');
+            const stripeColor = '#' + stripeColorHex.toString(16).padStart(6, '0');
+
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            const numStripes = 6;
+            const stripeWidth = canvas.width / (numStripes * 2);
+
+            ctx.fillStyle = stripeColor;
+            for (let i = 0; i < numStripes; i++) {
+                const x = (i * 2 + 0.5) * stripeWidth;
+                ctx.fillRect(x, 0, stripeWidth, canvas.height);
+                ctx.fillStyle = '#d4af37';
+                ctx.fillRect(x, 0, 4, canvas.height);
+                ctx.fillRect(x + stripeWidth - 4, 0, 4, canvas.height);
+                ctx.fillStyle = stripeColor;
+            }
+
+            ctx.fillStyle = '#d4af37';
+            ctx.fillRect(0, 0, canvas.width, 6);
+            ctx.fillRect(0, canvas.height - 6, canvas.width, 6);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.ClampToEdgeWrapping;
+            return texture;
+        }
+
+        function createDynamicGeometricTexture(palette) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+
+            const patternType = Math.floor(Math.random() * 4);
+            const c1 = palette.c1;
+            const c2 = palette.c2;
+
+            ctx.fillStyle = c1;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = c2;
+
+            if (patternType === 0) {
+                const size = 64;
+                for (let y = 0; y < canvas.height; y += size) {
+                    for (let x = 0; x < canvas.width; x += size) {
+                        if ((x / size + y / size) % 2 === 0) {
+                            ctx.fillRect(x, y, size, size);
+                        }
+                    }
+                }
+            } else if (patternType === 1) {
+                const width = 48;
+                for (let i = -canvas.width; i < canvas.width * 2; i += width * 2) {
+                    ctx.beginPath();
+                    ctx.moveTo(i, 0);
+                    ctx.lineTo(i + width, 0);
+                    ctx.lineTo(i + width + canvas.height, canvas.height);
+                    ctx.lineTo(i + canvas.height, canvas.height);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            } else if (patternType === 2) {
+                const r = 24;
+                const spacing = 70;
+                for (let y = spacing / 2; y < canvas.height; y += spacing) {
+                    for (let x = spacing / 2; x < canvas.width; x += spacing) {
+                        ctx.beginPath();
+                        ctx.arc(x, y, r, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            } else if (patternType === 3) {
+                const size = 64;
+                for (let y = 0; y < canvas.height + size; y += size) {
+                    for (let x = 0; x < canvas.width + size; x += size) {
+                        ctx.beginPath();
+                        ctx.moveTo(x, y - size / 2);
+                        ctx.lineTo(x + size / 2, y);
+                        ctx.lineTo(x, y + size / 2);
+                        ctx.lineTo(x - size / 2, y);
+                        ctx.closePath();
+                        ctx.fill();
+                    }
+                }
+            }
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(4, 4);
+            return texture;
+        }
+
+        const singleChipGroup = new THREE.Group();
+        scene.add(singleChipGroup);
+
+        const stageGroup = new THREE.Group();
+        scene.add(stageGroup);
+
+        let bgMesh = null;
+        let currentBgShapeType = 0;
+
+        // Base 3D Casino Chip Construction - Robust Multi-Mesh Architecture
+        function createCasinoChipMesh(imageFilename, baseColorHex = currentChipColor, stripeColorHex = currentStripeColor, customBackStyle = null) {
+            const heightVal = parseFloat(document.getElementById('input-height').value);
+            const metalVal = parseFloat(document.getElementById('input-metal').value);
+            const roughVal = parseFloat(document.getElementById('input-rough').value);
+
+            const chipGroup = new THREE.Group();
+
+            // 1. Edge Cylinder Mesh (Side rim)
+            const edgeGeo = new THREE.CylinderGeometry(1, 1, heightVal, 128, 1, true);
+            const edgeTex = createEdgeTexture(baseColorHex, stripeColorHex);
+            const edgeMat = new THREE.MeshStandardMaterial({ map: edgeTex, roughness: roughVal, metalness: metalVal * 0.5, side: THREE.DoubleSide });
+            const edgeMesh = new THREE.Mesh(edgeGeo, edgeMat);
+            chipGroup.add(edgeMesh);
+
+            // 2. Front Face Mesh (+Y Top Disk)
+            const frontGeo = new THREE.CircleGeometry(1, 128);
+            frontGeo.rotateX(-Math.PI / 2);
+
+            const rawFrontTex = (imageFilename && loadedTextures[imageFilename]) ? loadedTextures[imageFilename] : createDefaultFallbackTexture();
+            const frontCanvas = createBakedCanvas(rawFrontTex, false);
+            const frontTex = new THREE.CanvasTexture(frontCanvas);
+            frontTex.encoding = THREE.sRGBEncoding;
+
+            const faceMat = new THREE.MeshStandardMaterial({ map: frontTex, roughness: roughVal, metalness: metalVal * 0.3, side: THREE.FrontSide });
+            const frontMesh = new THREE.Mesh(frontGeo, faceMat);
+            frontMesh.position.y = heightVal / 2;
+            chipGroup.add(frontMesh);
+
+            // 3. Back Face Mesh (-Y Bottom Disk)
+            const backGeo = new THREE.CircleGeometry(1, 128);
+            backGeo.rotateX(Math.PI / 2);
+
+            const backStyle = customBackStyle || document.getElementById('back-design-select').value;
+            let backTex = null;
+            let backNormalTex = null;
+            let backMetal = metalVal * 0.3;
+            let backRough = roughVal;
+
+            if (backStyle === 'metallic') {
+                const relief = createReliefTextures(rawFrontTex, 'metallic');
+                backTex = relief.diffuseTex;
+                backNormalTex = relief.normalTex;
+                backMetal = 0.98;
+                backRough = 0.08;
+            } else if (backStyle === 'gold_relief') {
+                const relief = createReliefTextures(rawFrontTex, 'gold');
+                backTex = relief.diffuseTex;
+                backNormalTex = relief.normalTex;
+                backMetal = 0.92;
+                backRough = 0.12;
+            } else if (backStyle === 'silver_relief') {
+                const relief = createReliefTextures(rawFrontTex, 'silver');
+                backTex = relief.diffuseTex;
+                backNormalTex = relief.normalTex;
+                backMetal = 0.95;
+                backRough = 0.10;
+            } else if (backStyle === 'number') {
+                const num = casinoNumbers[Math.floor(Math.random() * casinoNumbers.length)];
+                backTex = createNumberBackTexture(num, baseColorHex);
+                backMetal = 0.6;
+            } else if (backStyle === 'rings') {
+                backTex = createRingsBackTexture(baseColorHex);
+                backMetal = 0.7;
+            } else { // 'same'
+                const backCanvas = createBakedCanvas(rawFrontTex, true);
+                backTex = new THREE.CanvasTexture(backCanvas);
+                backTex.encoding = THREE.sRGBEncoding;
+            }
+
+            const backMat = new THREE.MeshStandardMaterial({
+                map: backTex,
+                normalMap: backNormalTex,
+                normalScale: backNormalTex ? new THREE.Vector2(1.8, 1.8) : new THREE.Vector2(1, 1),
+                roughness: backRough,
+                metalness: backMetal,
+                side: THREE.FrontSide
+            });
+
+            const backMesh = new THREE.Mesh(backGeo, backMat);
+            backMesh.position.y = -heightVal / 2;
+            chipGroup.add(backMesh);
+
+            // Decorative Rings
+            const ringGeo = new THREE.TorusGeometry(0.98, 0.02, 16, 100);
+            const ringMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.85, roughness: 0.15 });
+            
+            const topRing = new THREE.Mesh(ringGeo, ringMat);
+            topRing.rotation.x = Math.PI / 2;
+            topRing.position.y = heightVal / 2 + 0.001;
+            chipGroup.add(topRing);
+
+            const bottomRing = topRing.clone();
+            bottomRing.position.y = -heightVal / 2 - 0.001;
+            chipGroup.add(bottomRing);
+
+            return chipGroup;
+        }
+
+        function syncColorUI() {
+            document.querySelectorAll('#color-presets .color-dot').forEach(dot => {
+                const dotColor = parseInt(dot.dataset.hex);
+                dot.classList.toggle('active', dotColor === currentChipColor);
+            });
+            document.querySelectorAll('#stripe-presets .color-dot').forEach(dot => {
+                const dotColor = parseInt(dot.dataset.hex);
+                dot.classList.toggle('active', dotColor === currentStripeColor);
+            });
+        }
+
+        let currentSingleMesh = null;
+        function updateSingleChip() {
+            if (currentSingleMesh) singleChipGroup.remove(currentSingleMesh);
+            const currentItem = imageItems[currentImageIndex] || null;
+            if (currentItem) {
+                if (currentItem.chipColor !== undefined) currentChipColor = currentItem.chipColor;
+                if (currentItem.stripeColor !== undefined) currentStripeColor = currentItem.stripeColor;
+            }
+            syncColorUI();
+            const imageName = currentItem ? currentItem.name : null;
+            currentSingleMesh = createCasinoChipMesh(imageName, currentChipColor, currentStripeColor);
+            singleChipGroup.add(currentSingleMesh);
+        }
+
+        // ====================================================
+        // STAGE SHOWCASE ENGINE WITH DYNAMIC PATTERN & COLOR WAVE BACKGROUNDS
+        // ====================================================
+        let stageChips = [];
+        let nextSpawnTime = 0;
+        let isWaveExiting = false;
+
+        function createNewWaveBackground() {
+            if (bgMesh) {
+                stageGroup.remove(bgMesh);
+                bgMesh = null;
+            }
+
+            const randomPalette = bgPalettes[Math.floor(Math.random() * bgPalettes.length)];
+            const bgTex = createDynamicGeometricTexture(randomPalette);
+            const bgMat = new THREE.MeshBasicMaterial({ map: bgTex, side: THREE.DoubleSide });
+
+            currentBgShapeType = Math.floor(Math.random() * 2);
+            let bgGeo;
+
+            if (currentBgShapeType === 0) { // Right Area Shape
+                const shape = new THREE.Shape();
+                shape.moveTo(0.5, -6);
+                shape.lineTo(6, -6);
+                shape.lineTo(6, 6);
+                shape.lineTo(2.2, 6);
+                shape.closePath();
+                bgGeo = new THREE.ShapeGeometry(shape);
+            } else { // Left Area Shape
+                const shape = new THREE.Shape();
+                shape.moveTo(-6, -6);
+                shape.lineTo(-0.5, -6);
+                shape.lineTo(-2.2, 6);
+                shape.lineTo(-6, 6);
+                shape.closePath();
+                bgGeo = new THREE.ShapeGeometry(shape);
+            }
+
+            bgMesh = new THREE.Mesh(bgGeo, bgMat);
+            bgMesh.position.z = -1.2; // PUSHED BACK FURTHER TO PREVENT CHIP CLIPPING!
+            stageGroup.add(bgMesh);
+
+            return { shapeType: currentBgShapeType, mesh: bgMesh };
+        }
+
+        class OPStageChip {
+            constructor(imageItem, targetPos, entryDirection, exitDirection) {
+                const chipColor = (imageItem && imageItem.chipColor !== undefined)
+                    ? imageItem.chipColor
+                    : colorPresets[Math.floor(Math.random() * colorPresets.length)].hex;
+                const stripeColor = (imageItem && imageItem.stripeColor !== undefined)
+                    ? imageItem.stripeColor
+                    : stripePresets[Math.floor(Math.random() * stripePresets.length)].hex;
+                
+                const chipScaleVal = parseFloat(document.getElementById('input-chip-scale').value);
+
+                this.group = new THREE.Group();
+                this.group.scale.set(chipScaleVal, chipScaleVal, chipScaleVal);
+                stageGroup.add(this.group);
+
+                // Y-Spin Group (Pure Y-axis rotation ONLY)
+                this.ySpinGroup = new THREE.Group();
+                this.group.add(this.ySpinGroup);
+
+                // 3D Mesh
+                const imageName = (imageItem && typeof imageItem === 'object') ? imageItem.name : imageItem;
+                this.mesh = createCasinoChipMesh(imageName, chipColor, stripeColor);
+                this.mesh.rotation.x = Math.PI / 2;
+                this.ySpinGroup.add(this.mesh);
+
+                this.targetPos = targetPos;
+                this.startPos = new THREE.Vector3();
+                this.exitPos = new THREE.Vector3();
+
+                const dist = 14;
+                switch (entryDirection) {
+                    case 'top': this.startPos.set(targetPos.x, targetPos.y + dist, targetPos.z); break;
+                    case 'bottom': this.startPos.set(targetPos.x, targetPos.y - dist, targetPos.z); break;
+                    case 'left': this.startPos.set(targetPos.x - dist, targetPos.y, targetPos.z); break;
+                    case 'right': this.startPos.set(targetPos.x + dist, targetPos.y, targetPos.z); break;
+                }
+
+                switch (exitDirection) {
+                    case 'top': this.exitPos.set(targetPos.x, targetPos.y + dist, targetPos.z); break;
+                    case 'bottom': this.exitPos.set(targetPos.x, targetPos.y - dist, targetPos.z); break;
+                    case 'left': this.exitPos.set(targetPos.x - dist, targetPos.y, targetPos.z); break;
+                    case 'right': this.exitPos.set(targetPos.x + dist, targetPos.y, targetPos.z); break;
+                    case 'top-left': this.exitPos.set(targetPos.x - dist, targetPos.y + dist, targetPos.z); break;
+                    case 'top-right': this.exitPos.set(targetPos.x + dist, targetPos.y + dist, targetPos.z); break;
+                    case 'bottom-left': this.exitPos.set(targetPos.x - dist, targetPos.y - dist, targetPos.z); break;
+                    case 'bottom-right': this.exitPos.set(targetPos.x + dist, targetPos.y - dist, targetPos.z); break;
+                }
+
+                this.group.position.copy(this.startPos);
+
+                this.animTime = 0;
+                this.duration = 0.85;
+                this.isArrived = false;
+                this.decelerateTime = 0;
+                
+                // Pure Y-axis speeds in radians per second (delta-based)
+                this.baseSpinSpeedY = 1.0 + Math.random() * 0.5; // Steady viewing speed (~0.25 rev/sec)
+                this.entrySpinSpeedY = 36.0 + Math.random() * 8.0; // Constant rapid slide-in Y-spin (~6.0 rev/sec)
+                this.currentSpinSpeedY = this.entrySpinSpeedY;
+            }
+
+            update(delta, exiting) {
+                // Pure Y-axis rotation ONLY!
+                this.ySpinGroup.rotation.y += delta * this.currentSpinSpeedY;
+
+                if (exiting) {
+                    this.animTime += delta * 1.5;
+                    const t = Math.min(1, Math.pow(this.animTime, 2.5));
+                    this.group.position.lerpVectors(this.targetPos, this.exitPos, t);
+                    this.currentSpinSpeedY = this.baseSpinSpeedY * 8.0;
+                } else if (!this.isArrived) {
+                    // WHILE SLIDING IN: Keep constant top speed (entrySpinSpeedY) without any premature slowdown!
+                    this.animTime += delta;
+                    const progress = Math.min(1, this.animTime / this.duration);
+                    
+                    const t = 1 - Math.pow(1 - progress, 3);
+                    this.group.position.lerpVectors(this.startPos, this.targetPos, t);
+                    this.currentSpinSpeedY = this.entrySpinSpeedY; // Maintain constant top speed during movement
+
+                    if (progress >= 1) {
+                        this.isArrived = true;
+                        this.group.position.copy(this.targetPos);
+                        this.decelerateTime = 0;
+                    }
+                } else {
+                    // AFTER ARRIVING AT TARGET POSITION: Start swift deceleration down to base viewing speed over 0.4s!
+                    if (this.currentSpinSpeedY > this.baseSpinSpeedY) {
+                        this.decelerateTime += delta;
+                        const decelProgress = Math.min(1, this.decelerateTime / 0.4); // 0.4s deceleration easing
+                        this.currentSpinSpeedY = THREE.MathUtils.lerp(this.entrySpinSpeedY, this.baseSpinSpeedY, Math.pow(decelProgress, 2));
+                    } else {
+                        this.currentSpinSpeedY = this.baseSpinSpeedY;
+                    }
+                }
+            }
+
+            destroy() {
+                stageGroup.remove(this.group);
+            }
+        }
+
+        function getNonOverlappingTargetPosOnBg(shapeType, existingChips, maxCount) {
+            let minX = 1.2, maxX = 3.6, minY = -2.2, maxY = 2.2;
+            if (shapeType === 1) { minX = -3.6; maxX = -1.2; }
+
+            const chipScaleVal = parseFloat(document.getElementById('input-chip-scale').value);
+            const minDistance = chipScaleVal * 2.2;
+
+            let attempts = 0;
+            let targetPos = new THREE.Vector3();
+
+            while (attempts < 150) {
+                const y = minY + Math.random() * (maxY - minY);
+                
+                let allowedMinX = minX;
+                let allowedMaxX = maxX;
+
+                if (shapeType === 0) {
+                    allowedMinX = THREE.MathUtils.lerp(0.6, 2.3, (y + 6) / 12);
+                    allowedMaxX = 5.2;
+                } else {
+                    allowedMinX = -5.2;
+                    allowedMaxX = THREE.MathUtils.lerp(-0.6, -2.3, (y + 6) / 12);
+                }
+
+                const x = allowedMinX + Math.random() * Math.max(0.2, (allowedMaxX - allowedMinX));
+                const z = existingChips.length * 0.05;
+
+                targetPos.set(x, y, z);
+
+                let overlaps = false;
+                for (let i = 0; i < existingChips.length; i++) {
+                    const dist = targetPos.distanceTo(existingChips[i].targetPos);
+                    if (dist < minDistance) {
+                        overlaps = true;
+                        break;
+                    }
+                }
+
+                if (!overlaps) {
+                    return targetPos;
+                }
+                attempts++;
+            }
+
+            const row = Math.floor(existingChips.length / 2);
+            const col = existingChips.length % 2;
+            const fallbackX = shapeType === 0 ? 2.4 + col * 1.2 : -2.4 - col * 1.2;
+            const fallbackY = maxY - (row + 0.5) * 1.6;
+            return new THREE.Vector3(fallbackX, fallbackY, existingChips.length * 0.05);
+        }
+
+        function spawnNextOPChip() {
+            if (imageItems.length === 0) return;
+            const maxCount = parseInt(document.getElementById('stage-count-select').value);
+            if (stageChips.length >= maxCount || isWaveExiting) return;
+
+            if (!bgMesh) {
+                createNewWaveBackground();
+            }
+
+            // Pick a random chip item from registered imageItems
+            const randomItemIndex = Math.floor(Math.random() * imageItems.length);
+            const currentItem = imageItems[randomItemIndex];
+            const targetPos = getNonOverlappingTargetPosOnBg(currentBgShapeType, stageChips, maxCount);
+
+            const entryDirs = ['top', 'bottom', 'left', 'right'];
+            const exitDirs = ['top', 'bottom', 'left', 'right', 'top-left', 'top-right', 'bottom-left', 'bottom-right'];
+            
+            const entryDir = entryDirs[Math.floor(Math.random() * entryDirs.length)];
+            const exitDir = exitDirs[Math.floor(Math.random() * exitDirs.length)];
+
+            const newChip = new OPStageChip(currentItem, targetPos, entryDir, exitDir);
+            stageChips.push(newChip);
+
+            if (stageChips.length >= maxCount) {
+                setTimeout(() => {
+                    triggerWaveFrameOut();
+                }, 2500);
+            }
+        }
+
+        function triggerWaveFrameOut() {
+            isWaveExiting = true;
+            stageChips.forEach(c => c.animTime = 0);
+            
+            // Seamless Background Transition: Swap background immediately for the next wave so black void never shows!
+            createNewWaveBackground();
+
+            setTimeout(() => {
+                stageChips.forEach(c => c.destroy());
+                stageChips = [];
+                isWaveExiting = false;
+            }, 1000);
+        }
+    </script>
+
+    <!-- Modal Dialog for File Import Choice (Replace vs Add) -->
+    <div class="modal-backdrop" id="import-modal">
+        <div class="modal-card">
+            <h3>🖼️ 画像セット読み込み設定</h3>
+            <p id="import-modal-desc">新しい画像ファイルが選択されました。<br>既存の画像セットを置き換えますか？それとも末尾に追加しますか？</p>
+            <div class="modal-buttons">
+                <button class="btn-modal-replace" id="btn-import-replace">🔄 既存を置き換える</button>
+                <button class="btn-modal-add" id="btn-import-add">➕ 末尾に追加する</button>
+                <button class="btn-modal-cancel" id="btn-import-cancel">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let pendingImportFiles = null;
+
+        function refreshCarousel() {
+            const carousel = document.getElementById('image-carousel');
+            carousel.innerHTML = '';
+
+            if (imageItems.length === 0) {
+                const emptyNotice = document.createElement('div');
+                emptyNotice.style.cssText = 'color: var(--accent-color); font-size: 0.85rem; font-weight: 600; text-align: center; width: 100%; padding: 8px;';
+                emptyNotice.innerText = '📁 右パネルから画像ファイルまたはフォルダを選択して読み込んでください';
+                carousel.appendChild(emptyNotice);
+                return;
+            }
+
+            imageItems.forEach((item, idx) => {
+                const thumb = document.createElement('div');
+                thumb.className = `thumb-item ${idx === currentImageIndex ? 'active' : ''}`;
+                
+                const img = document.createElement('img');
+                img.src = item.url;
+                img.alt = item.name;
+                thumb.appendChild(img);
+
+                // Individual Chip Delete Button
+                const delBtn = document.createElement('div');
+                delBtn.className = 'thumb-delete-btn';
+                delBtn.innerText = '✕';
+                delBtn.title = 'このチップを削除';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    deleteChipByIndex(idx);
+                };
+                thumb.appendChild(delBtn);
+
+                thumb.onclick = () => {
+                    document.querySelectorAll('.thumb-item').forEach(el => el.classList.remove('active'));
+                    thumb.classList.add('active');
+                    currentImageIndex = idx;
+                    updateSingleChip();
+                };
+                carousel.appendChild(thumb);
+            });
+        }
+
+        function deleteChipByIndex(index) {
+            imageItems.splice(index, 1);
+            if (imageItems.length === 0) {
+                currentImageIndex = 0;
+            } else if (currentImageIndex >= imageItems.length) {
+                currentImageIndex = imageItems.length - 1;
+            }
+            refreshCarousel();
+            updateSingleChip();
+        }
+
+        function handleFileSelect(inputElement) {
+            const files = inputElement.files;
+            if (!files || files.length === 0) return;
+            const validFiles = Array.from(files).filter(f => f.type.startsWith('image/'));
+            if (validFiles.length === 0) {
+                alert('有効な画像ファイルが見つかりませんでした。');
+                inputElement.value = '';
+                return;
+            }
+
+            pendingImportFiles = validFiles;
+
+            const modal = document.getElementById('import-modal');
+            const desc = document.getElementById('import-modal-desc');
+            desc.innerHTML = `<b>${validFiles.length}枚</b>の画像ファイルが選択されました。<br>既存のリスト (${imageItems.length}枚) と入れ替えますか？追加しますか？`;
+            
+            // Show modal immediately
+            modal.style.display = 'flex';
+            setTimeout(() => {
+                modal.classList.add('active');
+            }, 10);
+
+            // Reset input value so re-selecting the exact same files/folder triggers event again!
+            inputElement.value = '';
+        }
+
+        function executeImport(mode) {
+            if (!pendingImportFiles || pendingImportFiles.length === 0) return;
+
+            const newItems = pendingImportFiles.map(file => {
+                const url = URL.createObjectURL(file);
+                const randColor = colorPresets[Math.floor(Math.random() * colorPresets.length)].hex;
+                const randStripe = stripePresets[Math.floor(Math.random() * stripePresets.length)].hex;
+                return {
+                    name: file.name,
+                    url: url,
+                    chipColor: randColor,
+                    stripeColor: randStripe,
+                    backStyle: 'default'
+                };
+            });
+
+            if (mode === 'replace') {
+                imageItems = newItems;
+                currentImageIndex = 0;
+            } else if (mode === 'add') {
+                imageItems = imageItems.concat(newItems);
+            }
+
+            let preCount = 0;
+            newItems.forEach(item => {
+                loadSingleTexture(item, () => {
+                    preCount++;
+                    if (preCount === newItems.length) {
+                        refreshCarousel();
+                        updateSingleChip();
+                    }
+                });
+            });
+
+            pendingImportFiles = null;
+            const modal = document.getElementById('import-modal');
+            modal.classList.remove('active');
+            setTimeout(() => { modal.style.display = 'none'; }, 300);
+        }
+
+        function exportGLTF() {
+            const exporter = new THREE.GLTFExporter();
+            const targetGroup = currentMode === 'single' ? singleChipGroup : stageGroup;
+
+            // Preserve current animation transform
+            const savedRotX = targetGroup.rotation.x;
+            const savedRotY = targetGroup.rotation.y;
+            const savedRotZ = targetGroup.rotation.z;
+            const savedPosY = targetGroup.position.y;
+
+            // Reset alignment for 3D export
+            targetGroup.rotation.set(0, 0, 0);
+            targetGroup.position.y = 0;
+            targetGroup.updateMatrixWorld(true);
+
+            const loadPromises = [];
+
+            // Force pre-rendering of all Canvas textures to HTMLImageElements with static DataURLs
+            targetGroup.traverse((child) => {
+                if (child.isMesh && child.material) {
+                    const materials = Array.isArray(child.material) ? child.material : [child.material];
+                    materials.forEach(mat => {
+                        ['map', 'normalMap'].forEach(texKey => {
+                            const tex = mat[texKey];
+                            if (tex && tex.image && tex.image instanceof HTMLCanvasElement) {
+                                const dataUrl = tex.image.toDataURL('image/png');
+                                const p = new Promise((resolve) => {
+                                    const img = new Image();
+                                    img.onload = () => {
+                                        const newTex = new THREE.Texture(img);
+                                        newTex.encoding = tex.encoding || THREE.sRGBEncoding;
+                                        newTex.needsUpdate = true;
+                                        mat[texKey] = newTex;
+                                        resolve();
+                                    };
+                                    img.src = dataUrl;
+                                });
+                                loadPromises.push(p);
+                            }
+                        });
+                    });
+                }
+            });
+
+            Promise.all(loadPromises).then(() => {
+                exporter.parse(
+                    targetGroup,
+                    (glb) => {
+                        const blob = new Blob([glb], { type: 'application/octet-stream' });
+                        const link = document.createElement('a');
+                        link.href = URL.createObjectURL(blob);
+                        link.download = `casino_chip.glb`;
+                        link.click();
+
+                        // Restore animation transform
+                        targetGroup.rotation.set(savedRotX, savedRotY, savedRotZ);
+                        targetGroup.position.y = savedPosY;
+                        targetGroup.updateMatrixWorld(true);
+                    },
+                    { binary: true, embedImages: true }
+                );
+            });
+        }
+
+        function exportOBJ() {
+            const exporter = new THREE.OBJExporter();
+            const targetMesh = currentMode === 'single' ? singleChipGroup : stageGroup;
+
+            // Preserve current animation transform
+            const savedRotX = targetMesh.rotation.x;
+            const savedRotY = targetMesh.rotation.y;
+            const savedRotZ = targetMesh.rotation.z;
+            const savedPosY = targetMesh.position.y;
+
+            // Reset to perfectly level, upright zero-rotation alignment
+            targetMesh.rotation.set(0, 0, 0);
+            targetMesh.position.y = 0;
+            targetMesh.updateMatrixWorld(true);
+
+            const result = exporter.parse(targetMesh);
+            
+            const blob = new Blob([result], { type: 'text/plain' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `casino_chip.obj`;
+            link.click();
+
+            // Restore current animation transform after export
+            targetMesh.rotation.set(savedRotX, savedRotY, savedRotZ);
+            targetMesh.position.y = savedPosY;
+            targetMesh.updateMatrixWorld(true);
+        }
+
+        let mediaRecorder = null;
+        let recordedChunks = [];
+
+        function toggleVideoRecording() {
+            const recBtn = document.getElementById('btn-record-video');
+            const uiOverlay = document.getElementById('ui-overlay');
+            const uiToggleBtn = document.getElementById('ui-toggle-btn');
+
+            if (mediaRecorder && mediaRecorder.state === 'recording') {
+                // Stop Recording
+                mediaRecorder.stop();
+                recBtn.classList.remove('recording');
+                recBtn.innerText = '🎥 演出動画を録画 (.webm)';
+                uiOverlay.classList.remove('ui-hidden');
+                uiToggleBtn.style.display = 'flex';
+                return;
+            }
+
+            // Start Recording
+            recordedChunks = [];
+            const canvasStream = renderer.domElement.captureStream(60); // 60 FPS Canvas Capture
+
+            let options = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                options = { mimeType: 'video/webm' };
+            }
+
+            try {
+                mediaRecorder = new MediaRecorder(canvasStream, options);
+            } catch (e) {
+                alert('お使いのブラウザはWebM動画録画に対応していません。');
+                return;
+            }
+
+            mediaRecorder.ondataavailable = (event) => {
+                if (event.data && event.data.size > 0) {
+                    recordedChunks.push(event.data);
+                }
+            };
+
+            mediaRecorder.onstop = () => {
+                const blob = new Blob(recordedChunks, { type: 'video/webm' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `casino_chip_showcase_${Date.now()}.webm`;
+                a.click();
+                URL.revokeObjectURL(url);
+            };
+
+            // Hide ALL UI elements (including UI toggle button) during recording!
+            uiOverlay.classList.add('ui-hidden');
+            uiToggleBtn.style.display = 'none';
+
+            mediaRecorder.start();
+            recBtn.classList.add('recording');
+            recBtn.innerText = '⏹️ 録画停止';
+
+            // Auto show UI if user presses Escape key
+            const escHandler = (e) => {
+                if (e.key === 'Escape' && mediaRecorder && mediaRecorder.state === 'recording') {
+                    toggleVideoRecording();
+                    window.removeEventListener('keydown', escHandler);
+                }
+            };
+            window.addEventListener('keydown', escHandler);
+        }
+
+        function initUI() {
+            const tabSingle = document.getElementById('tab-single');
+            const tabStage = document.getElementById('tab-stage');
+            const secSingle = document.getElementById('section-single-controls');
+            const secStage = document.getElementById('section-stage-controls');
+
+            const uiToggleBtn = document.getElementById('ui-toggle-btn');
+            const uiOverlay = document.getElementById('ui-overlay');
+            uiToggleBtn.onclick = () => {
+                isUIHidden = !isUIHidden;
+                uiOverlay.classList.toggle('ui-hidden', isUIHidden);
+                uiToggleBtn.innerText = isUIHidden ? '👁️ UIを表示' : '👁️ UIを非表示';
+            };
+
+            tabSingle.onclick = () => {
+                currentMode = 'single';
+                tabSingle.classList.add('active');
+                tabStage.classList.remove('active');
+                secSingle.classList.remove('hidden');
+                secStage.classList.add('hidden');
+                singleChipGroup.visible = true;
+                stageGroup.visible = false;
+                scene.background = new THREE.Color(0x080b12);
+                camera.position.set(0, 2.5, 5.5);
+                controls.target.set(0, 0, 0);
+                controls.enabled = true; // Fully enable 360-degree OrbitControls in single mode!
+                controls.update();
+            };
+
+            tabStage.onclick = () => {
+                currentMode = 'stage';
+                tabStage.classList.add('active');
+                tabSingle.classList.remove('active');
+                secStage.classList.remove('hidden');
+                secSingle.classList.add('hidden');
+                singleChipGroup.visible = false;
+                stageGroup.visible = true;
+                scene.background = new THREE.Color(0x000000);
+                camera.position.set(0, 0, 7);
+                controls.target.set(0, 0, 0);
+                controls.enabled = false; // DISABLE OrbitControls in stage mode as requested!
+            };
+
+            document.getElementById('btn-record-video').onclick = toggleVideoRecording;
+
+            // File / Folder Inputs and Import Choice Modal Event Listeners
+            document.getElementById('file-input').onchange = (e) => handleFileSelect(e.target);
+            document.getElementById('folder-input').onchange = (e) => handleFileSelect(e.target);
+
+            document.getElementById('btn-import-replace').onclick = () => executeImport('replace');
+            document.getElementById('btn-import-add').onclick = () => executeImport('add');
+            document.getElementById('btn-import-cancel').onclick = () => {
+                pendingImportFiles = null;
+                const modal = document.getElementById('import-modal');
+                modal.classList.remove('active');
+                setTimeout(() => { modal.style.display = 'none'; }, 300);
+            };
+
+            document.getElementById('back-design-select').onchange = () => {
+                updateSingleChip();
+            };
+
+            document.getElementById('input-img-scale').oninput = (e) => {
+                imgScale = parseFloat(e.target.value);
+                document.getElementById('val-img-scale').innerText = e.target.value;
+                updateSingleChip();
+            };
+            document.getElementById('input-img-offx').oninput = (e) => {
+                imgOffsetX = parseFloat(e.target.value);
+                document.getElementById('val-img-offx').innerText = e.target.value;
+                updateSingleChip();
+            };
+            document.getElementById('input-img-offy').oninput = (e) => {
+                imgOffsetY = parseFloat(e.target.value);
+                document.getElementById('val-img-offy').innerText = e.target.value;
+                updateSingleChip();
+            };
+
+            document.getElementById('input-chip-scale').oninput = (e) => {
+                document.getElementById('val-chip-scale').innerText = e.target.value;
+            };
+
+            const colorContainer = document.getElementById('color-presets');
+            colorPresets.forEach((c) => {
+                const dot = document.createElement('div');
+                dot.className = 'color-dot';
+                dot.dataset.hex = c.hex;
+                dot.style.backgroundColor = '#' + c.hex.toString(16).padStart(6, '0');
+                dot.title = c.name;
+                dot.onclick = () => {
+                    currentChipColor = c.hex;
+                    const currentItem = imageItems[currentImageIndex];
+                    if (currentItem) {
+                        currentItem.chipColor = c.hex;
+                    }
+                    syncColorUI();
+                    updateSingleChip();
+                };
+                colorContainer.appendChild(dot);
+            });
+
+            const stripeContainer = document.getElementById('stripe-presets');
+            stripePresets.forEach((c) => {
+                const dot = document.createElement('div');
+                dot.className = 'color-dot';
+                dot.dataset.hex = c.hex;
+                dot.style.backgroundColor = '#' + c.hex.toString(16).padStart(6, '0');
+                dot.title = c.name;
+                dot.onclick = () => {
+                    currentStripeColor = c.hex;
+                    const currentItem = imageItems[currentImageIndex];
+                    if (currentItem) {
+                        currentItem.stripeColor = c.hex;
+                    }
+                    syncColorUI();
+                    updateSingleChip();
+                };
+                stripeContainer.appendChild(dot);
+            });
+
+            refreshCarousel();
+
+            document.getElementById('input-metal').oninput = (e) => {
+                document.getElementById('val-metal').innerText = e.target.value;
+                updateSingleChip();
+            };
+            document.getElementById('input-rough').oninput = (e) => {
+                document.getElementById('val-rough').innerText = e.target.value;
+                updateSingleChip();
+            };
+            document.getElementById('input-height').oninput = (e) => {
+                document.getElementById('val-height').innerText = e.target.value;
+                updateSingleChip();
+            };
+
+            document.getElementById('btn-spin').onclick = (e) => {
+                isAutoSpin = !isAutoSpin;
+                e.target.classList.toggle('active', isAutoSpin);
+            };
+
+            document.getElementById('btn-flip').onclick = () => {
+                if (currentMode !== 'single') return;
+                let targetRot = singleChipGroup.rotation.x + Math.PI;
+                let startTime = performance.now();
+                let startRot = singleChipGroup.rotation.x;
+
+                function animateFlip(now) {
+                    let elapsed = (now - startTime) / 600;
+                    if (elapsed < 1) {
+                        singleChipGroup.rotation.x = THREE.MathUtils.lerp(startRot, targetRot, Math.sin(elapsed * Math.PI / 2));
+                        singleChipGroup.position.y = Math.sin(elapsed * Math.PI) * 0.8;
+                        requestAnimationFrame(animateFlip);
+                    } else {
+                        singleChipGroup.rotation.x = targetRot;
+                        singleChipGroup.position.y = 0;
+                    }
+                }
+                requestAnimationFrame(animateFlip);
+            };
+
+            document.getElementById('btn-export').onclick = exportGLTF;
+            document.getElementById('btn-export-obj').onclick = exportOBJ;
+        }
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // Raycaster and OrbitControls interaction handler for single mode
+        let spinVelocityX = 0;
+        const raycaster = new THREE.Raycaster();
+        const mouseVec = new THREE.Vector2();
+
+        function onCanvasDblClick(event) {
+            if (currentMode !== 'single') return;
+
+            const rect = renderer.domElement.getBoundingClientRect();
+            mouseVec.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            mouseVec.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+            raycaster.setFromCamera(mouseVec, camera);
+            const intersects = raycaster.intersectObjects(singleChipGroup.children, true);
+
+            if (intersects.length > 0) {
+                // Apply a satisfying X-axis flip impulse (front and back spinning flip)
+                spinVelocityX = 0.40 + Math.random() * 0.15;
+            }
+        }
+
+        // Attach dblclick listener directly to renderer canvas so OrbitControls handles drag on pointerdown/mousemove seamlessly!
+        renderer.domElement.addEventListener('dblclick', onCanvasDblClick);
+
+        // Animation Loop
+        let lastTime = performance.now();
+        function animate(now) {
+            requestAnimationFrame(animate);
+            const delta = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (currentMode === 'single') {
+                if (isAutoSpin) {
+                    singleChipGroup.rotation.y += 0.008;
+                }
+                
+                // Double-click X-axis flip spin impulse decay with natural friction
+                if (spinVelocityX > 0.0001) {
+                    singleChipGroup.rotation.x += spinVelocityX;
+                    spinVelocityX *= 0.96; // 4% friction slowdown per frame for smooth natural stopping
+                } else {
+                    spinVelocityX = 0;
+                }
+            } else if (currentMode === 'stage') {
+                const intervalMs = parseFloat(document.getElementById('stage-interval-select').value) * 1000;
+                if (now > nextSpawnTime && !isWaveExiting) {
+                    spawnNextOPChip();
+                    nextSpawnTime = now + intervalMs;
+                }
+                stageChips.forEach(chip => chip.update(delta, isWaveExiting));
+            }
+
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // Synchronous app initialization matching user file import flow
+        initUI();
+        refreshCarousel();
+        updateSingleChip();
+
+        // Hide loading screen instantly
+        const loadingEl = document.getElementById('loading');
+        if (loadingEl) {
+            loadingEl.style.opacity = '0';
+            setTimeout(() => loadingEl.style.display = 'none', 200);
+        }
+
+        animate(performance.now());
+    </script>
+</body>
+</html>
