@@ -773,6 +773,24 @@
                 imgElement = fallbackTex.image;
             }
 
+            // Calculate native aspect ratio to strictly prevent stretching/distortion!
+            const nativeWidth = imgElement.naturalWidth || imgElement.width || 512;
+            const nativeHeight = imgElement.naturalHeight || imgElement.height || 512;
+            const aspect = nativeWidth / nativeHeight;
+
+            let drawW = 512;
+            let drawH = 512;
+
+            if (aspect > 1) {
+                // Wide landscape image: fit height to 512, scale width proportionally
+                drawW = 512 * aspect;
+                drawH = 512;
+            } else {
+                // Tall portrait image: fit width to 512, scale height proportionally
+                drawW = 512;
+                drawH = 512 / aspect;
+            }
+
             ctx.save();
             ctx.translate(256, 256);
             if (isBack) {
@@ -782,7 +800,9 @@
             const pxOffsetY = imgOffsetY * 512;
             ctx.translate(pxOffsetX, pxOffsetY);
             ctx.scale(imgScale, imgScale);
-            ctx.drawImage(imgElement, -256, -256, 512, 512);
+            
+            // Draw centered with strict aspect ratio preservation!
+            ctx.drawImage(imgElement, -drawW / 2, -drawH / 2, drawW, drawH);
             ctx.restore();
 
             return canvas;
