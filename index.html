@@ -497,7 +497,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/GLTFExporter.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/exporters/OBJExporter.js"></script>
 </head>
 <body>
 
@@ -522,7 +521,6 @@
             <div class="controls-bar">
                 <button class="btn btn-record" id="btn-record-video">🎥 演出動画を録画 (.webm)</button>
                 <button class="btn btn-export" id="btn-export">💾 3Dモデル出力 (.glb)</button>
-                <button class="btn" id="btn-export-obj">📄 .obj形式で保存</button>
             </div>
         </header>
 
@@ -1896,35 +1894,6 @@
             });
         }
 
-        function exportOBJ() {
-            const exporter = new THREE.OBJExporter();
-            const targetMesh = currentMode === 'single' ? singleChipGroup : stageGroup;
-
-            // Preserve current animation transform
-            const savedRotX = targetMesh.rotation.x;
-            const savedRotY = targetMesh.rotation.y;
-            const savedRotZ = targetMesh.rotation.z;
-            const savedPosY = targetMesh.position.y;
-
-            // Reset to perfectly level, upright zero-rotation alignment
-            targetMesh.rotation.set(0, 0, 0);
-            targetMesh.position.y = 0;
-            targetMesh.updateMatrixWorld(true);
-
-            const result = exporter.parse(targetMesh);
-            
-            const blob = new Blob([result], { type: 'text/plain' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `casino_chip.obj`;
-            link.click();
-
-            // Restore current animation transform after export
-            targetMesh.rotation.set(savedRotX, savedRotY, savedRotZ);
-            targetMesh.position.y = savedPosY;
-            targetMesh.updateMatrixWorld(true);
-        }
-
         let mediaRecorder = null;
         let recordedChunks = [];
 
@@ -2154,7 +2123,6 @@
             };
 
             document.getElementById('btn-export').onclick = exportGLTF;
-            document.getElementById('btn-export-obj').onclick = exportOBJ;
         }
 
         window.addEventListener('resize', () => {
